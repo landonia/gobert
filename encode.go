@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"reflect"
+	"math"
 )
 
 func write1(w io.Writer, ui8 uint8) { w.Write([]byte{ui8}) }
@@ -40,6 +41,15 @@ func writeFloat(w io.Writer, f float32) {
 
 	pad := make([]byte, 31-len(s))
 	w.Write(pad)
+}
+
+func writeNewFloat(w io.Writer, f float64) {
+	write1(w, NewFloatTag)
+
+	ui64 := math.Float64bits(f)
+	b := make([]byte, 8)
+	binary.BigEndian.PutUint64(b, ui64)
+	w.Write(b)
 }
 
 func writeAtom(w io.Writer, a string) {
@@ -78,6 +88,18 @@ func writeList(w io.Writer, l reflect.Value) {
 	writeNil(w)
 }
 
+func writeMap(w io.Writer, l reflect.Value) {
+	write1(w, MapTag)
+	keys := l.MapKeys()
+	len := uint32(len(keys))
+	write4(w, len)
+
+	for i := uint32(0); i < len; i++ {
+		writeTag(w, keys[i])
+		writeTag(w, l.MapIndex(keys[i]))
+	}
+}
+
 func writeTag(w io.Writer, val reflect.Value) (err error) {
 	switch v := val; v.Kind() {
 	case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
@@ -88,7 +110,7 @@ func writeTag(w io.Writer, val reflect.Value) (err error) {
 			writeInt(w, uint32(n))
 		}
 	case reflect.Float32, reflect.Float64:
-		writeFloat(w, float32(v.Float()))
+		writeNewFloat(w, v.Float())
 	case reflect.String:
 		if v.Type().Name() == "Atom" {
 			writeAtom(w, v.String())
@@ -101,6 +123,8 @@ func writeTag(w io.Writer, val reflect.Value) (err error) {
 		writeList(w, v)
 	case reflect.Interface:
 		writeTag(w, v.Elem())
+	case reflect.Map:
+		writeMap(w, v)
 	default:
 		if !reflect.Indirect(val).IsValid() {
 			writeNil(w)

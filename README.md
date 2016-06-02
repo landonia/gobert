@@ -34,5 +34,7 @@ History
 The gobert project was started by Joshua Peek in 2009. In 2013 he [confirmed
 that he was no longer maintaining
 it](https://twitter.com/joshpeek/status/299891081649209344), and Seth W.
-Klein assumed maintenance.
+Klein assumed maintenance. As the last update on this was in 2013, Landon Wainwright
+have added in support for more tags.. I aim to create pull requests to merge this back
+into the original source.
 

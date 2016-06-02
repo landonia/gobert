@@ -8,6 +8,8 @@ import (
 	"io/ioutil"
 	"reflect"
 	"strconv"
+	"math"
+	"fmt"
 )
 
 var ErrBadMagic error = errors.New("bad magic")
@@ -68,6 +70,16 @@ func readFloat(r io.Reader) (float32, error) {
 		return 0, err
 	}
 	return float32(f), nil
+}
+
+func readNewFloat(r io.Reader) (float64, error) {
+	bits, err := ioutil.ReadAll(io.LimitReader(r, 8))
+	if err != nil {
+		return 0, err
+	}
+
+	ui64 := binary.BigEndian.Uint64(bits)
+	return math.Float64frombits(ui64), nil
 }
 
 func readAtom(r io.Reader) (Atom, error) {
@@ -144,6 +156,11 @@ func readList(r io.Reader) ([]Term, error) {
 	return list, nil
 }
 
+type bin []uint8
+func (b bin) String() string {
+	return fmt.Sprintf("%s", b)
+}
+
 func readBin(r io.Reader) ([]uint8, error) {
 	size, err := read4(r)
 	if err != nil {
@@ -156,6 +173,29 @@ func readBin(r io.Reader) ([]uint8, error) {
 	}
 
 	return bytes, nil
+}
+
+func readMap(r io.Reader) (map[Term]Term, error) {
+	pairs, err := read4(r)
+	if err != nil {
+		return nil, err
+	}
+
+	m := make(map[Term]Term)
+
+	for i := 0; i < pairs; i++ {
+		key, err := readTag(r)
+		if err != nil {
+			return nil, err
+		}
+		value, err := readTag(r)
+		if err != nil {
+			return nil, err
+		}
+		m[key] = value
+	}
+
+	return m, nil
 }
 
 func readComplex(r io.Reader) (Term, error) {
@@ -197,6 +237,8 @@ func readTag(r io.Reader) (Term, error) {
 		return nil, ErrUnknownType
 	case FloatTag:
 		return readFloat(r)
+	case NewFloatTag:
+		return readNewFloat(r)
 	case AtomTag:
 		return readAtom(r)
 	case SmallTupleTag:
@@ -211,6 +253,8 @@ func readTag(r io.Reader) (Term, error) {
 		return readList(r)
 	case BinTag:
 		return readBin(r)
+	case MapTag:
+		return readMap(r)
 	}
 
 	return nil, ErrUnknownType
