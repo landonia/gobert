@@ -2,11 +2,14 @@ package bert
 
 import (
 	"bytes"
+	"compress/zlib"
 	"encoding/binary"
 	"fmt"
 	"io"
-	"reflect"
 	"math"
+	"math/big"
+	"reflect"
+	"unicode/utf8"
 )
 
 func write1(w io.Writer, ui8 uint8) { w.Write([]byte{ui8}) }
@@ -58,6 +61,12 @@ func writeAtom(w io.Writer, a string) {
 	w.Write([]byte(a))
 }
 
+func writeAtomUtf8(w io.Writer, a string) {
+	write1(w, AtomUtf8Tag)
+	write2(w, uint16(len(a)))
+	w.Write([]byte(a))
+}
+
 func writeSmallTuple(w io.Writer, t reflect.Value) {
 	write1(w, SmallTupleTag)
 	size := t.Len()
@@ -100,6 +109,118 @@ func writeMap(w io.Writer, l reflect.Value) {
 	}
 }
 
+func writeNode(w io.Writer, node Atom) {
+
+	// If the number of runes equal the number of bytes then UTF-8 is not required
+	if utf8.RuneCount([]byte(node)) == len(node) {
+		writeAtom(w, string(node))
+	} else {
+		writeAtomUtf8(w, string(node))
+	}
+}
+
+func writeReference(w io.Writer, l Reference) {
+	write1(w, ReferenceTag)
+	writeNode(w, l.Node)
+	write4(w, l.ID)
+	write1(w, l.Creation)
+}
+
+func writeNewReference(w io.Writer, l NewReference) {
+	write1(w, NewReferenceTag)
+	write2(w, uint16(len(l.ID)))
+	writeNode(w, l.Node)
+	write1(w, l.Creation)
+	for i := 0; i < len(l.Node); i++ {
+		write4(w, l.ID[i])
+	}
+}
+
+func writeLargeBigNum(w io.Writer, l big.Int) {
+	write1(w, LargeBignumTag)
+	write4(w, uint32(len(l.Bytes())))
+	writeBigNum(w, l)
+}
+
+func writeSmallBigNum(w io.Writer, l big.Int) {
+	write1(w, SmallBignumTag)
+	write1(w, uint8(len(l.Bytes())))
+	writeBigNum(w, l)
+}
+
+func writeBigNum(w io.Writer, l big.Int) {
+	if l.Sign() < 0 {
+		write1(w, 1)
+	} else {
+		write1(w, 0)
+	}
+
+	// The big.Int uses BigEndian for the bytes and the format is
+	// expecting LittleEndian. Reverse the bytes.
+	bEndBits := l.Bytes()
+	var lEndBits []byte
+	for i := len(bEndBits) - 1; i >= 0; i-- {
+		lEndBits = append(lEndBits, bEndBits[i])
+	}
+	w.Write(lEndBits)
+}
+
+func writePort(w io.Writer, l Port) {
+	write1(w, PortTag)
+	writeNode(w, l.Node)
+	write4(w, l.ID)
+	write1(w, l.Creation)
+}
+
+func writePid(w io.Writer, l Pid) {
+	write1(w, PidTag)
+	writeNode(w, l.Node)
+	write4(w, l.ID)
+	write4(w, l.Serial)
+	write1(w, l.Creation)
+}
+
+func writeFunc(w io.Writer, l Func) {
+	write1(w, FunTag)
+	write4(w, uint32(len(l.FreeVars)))
+	writePid(w, l.Pid)
+	writeNode(w, l.Module)
+	writeInt(w, l.Index)
+	writeInt(w, l.Uniq)
+	for i := 0; i < len(l.FreeVars); i++ {
+		writeTag(w, reflect.ValueOf(l.FreeVars[i]))
+	}
+}
+
+func writeNewFunc(w io.Writer, l NewFunc) {
+	write1(w, NewFunTag)
+
+	// Create a new buffer to write the bytes to so the
+	// total size can be written
+	buf := bytes.NewBuffer([]byte{})
+	write1(buf, l.Arity)
+	buf.Write(l.Uniq)
+	write4(buf, l.Index)
+	write4(buf, uint32(len(l.FreeVars)))
+	writeNode(buf, l.Module)
+	writeInt(buf, l.OldIndex)
+	writeInt(buf, l.OldUnique)
+	writePid(buf, l.Pid)
+	for i := 0; i < len(l.FreeVars); i++ {
+		writeTag(w, reflect.ValueOf(l.FreeVars[i]))
+	}
+
+	write4(w, uint32(buf.Len()))
+	w.Write(buf.Bytes())
+}
+
+func writeExport(w io.Writer, l Export) {
+	write1(w, ExportTag)
+	writeNode(w, l.Module)
+	writeNode(w, l.Function)
+	writeSmallInt(w, l.Arity)
+}
+
 func writeTag(w io.Writer, val reflect.Value) (err error) {
 	switch v := val; v.Kind() {
 	case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
@@ -113,7 +234,13 @@ func writeTag(w io.Writer, val reflect.Value) (err error) {
 		writeNewFloat(w, v.Float())
 	case reflect.String:
 		if v.Type().Name() == "Atom" {
-			writeAtom(w, v.String())
+
+			// If the number of runes equal the number of bytes then UTF-8 is not required
+			if utf8.RuneCount([]byte(v.String())) == len(v.String()) {
+				writeAtom(w, v.String())
+			} else {
+				writeAtomUtf8(w, v.String())
+			}
 		} else {
 			writeString(w, v.String())
 		}
@@ -125,6 +252,32 @@ func writeTag(w io.Writer, val reflect.Value) (err error) {
 		writeTag(w, v.Elem())
 	case reflect.Map:
 		writeMap(w, v)
+	case reflect.Struct:
+		vali := v.Interface()
+		switch rVal := vali.(type) {
+		case DistributionHeader:
+			err = ErrUnknownType
+		case Reference:
+			writeReference(w, rVal)
+		case NewReference:
+			writeNewReference(w, rVal)
+		case big.Int:
+			if len(rVal.Bytes()) >= 1<<8 {
+				writeLargeBigNum(w, rVal)
+			} else {
+				writeSmallBigNum(w, rVal)
+			}
+		case Port:
+			writePort(w, rVal)
+		case Pid:
+			writePid(w, rVal)
+		case Func:
+			writeFunc(w, rVal)
+		case NewFunc:
+			writeNewFunc(w, rVal)
+		case Export:
+			writeExport(w, rVal)
+		}
 	default:
 		if !reflect.Indirect(val).IsValid() {
 			writeNil(w)
@@ -138,16 +291,12 @@ func writeTag(w io.Writer, val reflect.Value) (err error) {
 
 // EncodeTo encodes val and writes it to w, returning any error.
 func EncodeTo(w io.Writer, val interface{}) (err error) {
-	write1(w, VersionTag)
-	err = writeTag(w, reflect.ValueOf(val))
-	return
+	return EncodeToAndCompress(w, val, false)
 }
 
 // Encode encodes val and returns it or an error.
 func Encode(val interface{}) ([]byte, error) {
-	buf := bytes.NewBuffer([]byte{})
-	err := EncodeTo(buf, val)
-	return buf.Bytes(), err
+	return EncodeAndCompress(val, false)
 }
 
 // Marshal is an alias for EncodeTo.
@@ -158,7 +307,51 @@ func Marshal(w io.Writer, val interface{}) error {
 // MarshalResponse encodes val into a BURP Response struct and writes it to w,
 // returning any error.
 func MarshalResponse(w io.Writer, val interface{}) (err error) {
-	resp, err := Encode(val)
+	return MarshalResponseAndCompress(w, val, false)
+}
+
+// EncodeToAndCompress encodes val and writes it to w, returning any error.
+// If compress is true the body will be compressed
+func EncodeToAndCompress(w io.Writer, val interface{}, compress bool) (err error) {
+	write1(w, VersionTag)
+	if compress {
+
+		// Write the bytes to a buffer (the original length is required)
+		buf := bytes.NewBuffer([]byte{})
+		err = writeTag(buf, reflect.ValueOf(val))
+		if err == nil {
+			write1(w, CompressedTag)
+			write4(w, uint32(buf.Len()))
+			zw := zlib.NewWriter(w)
+			_, err = zw.Write(buf.Bytes())
+			zw.Close()
+		}
+	} else {
+		// Write directly to the writer
+		err = writeTag(w, reflect.ValueOf(val))
+	}
+	return
+}
+
+// EncodeAndCompress encodes val and returns it or an error.
+// If compress is true the body will be compressed
+func EncodeAndCompress(val interface{}, compress bool) ([]byte, error) {
+	buf := bytes.NewBuffer([]byte{})
+	err := EncodeToAndCompress(buf, val, compress)
+	return buf.Bytes(), err
+}
+
+// MarshalAndCompress is an alias for EncodeTo.
+// If compress is true the body will be compressed
+func MarshalAndCompress(w io.Writer, val interface{}, compress bool) error {
+	return EncodeToAndCompress(w, val, compress)
+}
+
+// MarshalResponseAndCompress encodes val into a BURP Response struct and writes it to w,
+// returning any error.
+// If compress is true the body will be compressed
+func MarshalResponseAndCompress(w io.Writer, val interface{}, compress bool) (err error) {
+	resp, err := EncodeAndCompress(val, compress)
 
 	write4(w, uint32(len(resp)))
 	w.Write(resp)
