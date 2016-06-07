@@ -67,13 +67,13 @@ func writeAtomUtf8(w io.Writer, a string) {
 	w.Write([]byte(a))
 }
 
-func writeSmallTuple(w io.Writer, t reflect.Value) {
+func writeSmallTuple(w io.Writer, t reflect.Value, minorVersion int) {
 	write1(w, SmallTupleTag)
 	size := t.Len()
 	write1(w, uint8(size))
 
 	for i := 0; i < size; i++ {
-		writeTag(w, t.Index(i))
+		writeTag(w, t.Index(i), minorVersion)
 	}
 }
 
@@ -85,27 +85,27 @@ func writeString(w io.Writer, s string) {
 	w.Write([]byte(s))
 }
 
-func writeList(w io.Writer, l reflect.Value) {
+func writeList(w io.Writer, l reflect.Value, minorVersion int) {
 	write1(w, ListTag)
 	size := l.Len()
 	write4(w, uint32(size))
 
 	for i := 0; i < size; i++ {
-		writeTag(w, l.Index(i))
+		writeTag(w, l.Index(i), minorVersion)
 	}
 
 	writeNil(w)
 }
 
-func writeMap(w io.Writer, l reflect.Value) {
+func writeMap(w io.Writer, l reflect.Value, minorVersion int) {
 	write1(w, MapTag)
 	keys := l.MapKeys()
 	len := uint32(len(keys))
 	write4(w, len)
 
 	for i := uint32(0); i < len; i++ {
-		writeTag(w, keys[i])
-		writeTag(w, l.MapIndex(keys[i]))
+		writeTag(w, keys[i], minorVersion)
+		writeTag(w, l.MapIndex(keys[i]), minorVersion)
 	}
 }
 
@@ -166,10 +166,7 @@ func writeBigNum(w io.Writer, l big.Int) {
 }
 
 func writePort(w io.Writer, l Port) {
-	write1(w, PortTag)
-	writeNode(w, l.Node)
-	write4(w, l.ID)
-	write1(w, l.Creation)
+	writeReference(w, l.Reference)
 }
 
 func writePid(w io.Writer, l Pid) {
@@ -180,7 +177,7 @@ func writePid(w io.Writer, l Pid) {
 	write1(w, l.Creation)
 }
 
-func writeFunc(w io.Writer, l Func) {
+func writeFunc(w io.Writer, l Func, minorVersion int) {
 	write1(w, FunTag)
 	write4(w, uint32(len(l.FreeVars)))
 	writePid(w, l.Pid)
@@ -188,11 +185,11 @@ func writeFunc(w io.Writer, l Func) {
 	writeInt(w, l.Index)
 	writeInt(w, l.Uniq)
 	for i := 0; i < len(l.FreeVars); i++ {
-		writeTag(w, reflect.ValueOf(l.FreeVars[i]))
+		writeTag(w, reflect.ValueOf(l.FreeVars[i]), minorVersion)
 	}
 }
 
-func writeNewFunc(w io.Writer, l NewFunc) {
+func writeNewFunc(w io.Writer, l NewFunc, minorVersion int) {
 	write1(w, NewFunTag)
 
 	// Create a new buffer to write the bytes to so the
@@ -207,7 +204,7 @@ func writeNewFunc(w io.Writer, l NewFunc) {
 	writeInt(buf, l.OldUnique)
 	writePid(buf, l.Pid)
 	for i := 0; i < len(l.FreeVars); i++ {
-		writeTag(w, reflect.ValueOf(l.FreeVars[i]))
+		writeTag(w, reflect.ValueOf(l.FreeVars[i]), minorVersion)
 	}
 
 	write4(w, uint32(buf.Len()))
@@ -221,7 +218,7 @@ func writeExport(w io.Writer, l Export) {
 	writeSmallInt(w, l.Arity)
 }
 
-func writeTag(w io.Writer, val reflect.Value) (err error) {
+func writeTag(w io.Writer, val reflect.Value, minorVersion int) (err error) {
 	switch v := val; v.Kind() {
 	case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
 		n := v.Int()
@@ -231,7 +228,11 @@ func writeTag(w io.Writer, val reflect.Value) (err error) {
 			writeInt(w, uint32(n))
 		}
 	case reflect.Float32, reflect.Float64:
-		writeNewFloat(w, v.Float())
+		if minorVersion == MinorVersion0 {
+			writeFloat(w, float32(v.Float()))
+		} else {
+			writeNewFloat(w, v.Float())
+		}
 	case reflect.String:
 		if v.Type().Name() == "Atom" {
 
@@ -245,13 +246,13 @@ func writeTag(w io.Writer, val reflect.Value) (err error) {
 			writeString(w, v.String())
 		}
 	case reflect.Slice:
-		writeSmallTuple(w, v)
+		writeSmallTuple(w, v, minorVersion)
 	case reflect.Array:
-		writeList(w, v)
-	case reflect.Interface:
-		writeTag(w, v.Elem())
+		writeList(w, v, minorVersion)
+	case reflect.Interface, reflect.Ptr:
+		writeTag(w, v.Elem(), minorVersion)
 	case reflect.Map:
-		writeMap(w, v)
+		writeMap(w, v, minorVersion)
 	case reflect.Struct:
 		vali := v.Interface()
 		switch rVal := vali.(type) {
@@ -272,9 +273,9 @@ func writeTag(w io.Writer, val reflect.Value) (err error) {
 		case Pid:
 			writePid(w, rVal)
 		case Func:
-			writeFunc(w, rVal)
+			writeFunc(w, rVal, minorVersion)
 		case NewFunc:
-			writeNewFunc(w, rVal)
+			writeNewFunc(w, rVal, minorVersion)
 		case Export:
 			writeExport(w, rVal)
 		}
@@ -291,34 +292,61 @@ func writeTag(w io.Writer, val reflect.Value) (err error) {
 
 // EncodeTo encodes val and writes it to w, returning any error.
 func EncodeTo(w io.Writer, val interface{}) (err error) {
-	return EncodeToAndCompress(w, val, false)
+	return EncodeToUsingMinorVersion(w, val, MinorVersion1)
 }
 
 // Encode encodes val and returns it or an error.
 func Encode(val interface{}) ([]byte, error) {
-	return EncodeAndCompress(val, false)
+	return EncodeUsingMinorVersion(val, MinorVersion1)
 }
 
 // Marshal is an alias for EncodeTo.
 func Marshal(w io.Writer, val interface{}) error {
-	return EncodeTo(w, val)
+	return MarshalUsingMinorVersion(w, val, MinorVersion1)
 }
 
 // MarshalResponse encodes val into a BURP Response struct and writes it to w,
 // returning any error.
 func MarshalResponse(w io.Writer, val interface{}) (err error) {
-	return MarshalResponseAndCompress(w, val, false)
+	return MarshalResponseUsingMinorVersion(w, val, MinorVersion1)
 }
 
 // EncodeToAndCompress encodes val and writes it to w, returning any error.
 // If compress is true the body will be compressed
 func EncodeToAndCompress(w io.Writer, val interface{}, compress bool) (err error) {
+	return EncodeToAndCompressUsingMinorVersion(w, val, compress, MinorVersion1)
+}
+
+// EncodeTo encodes val and writes it to w, returning any error.
+func EncodeToUsingMinorVersion(w io.Writer, val interface{}, minorVersion int) (err error) {
+	return EncodeToAndCompressUsingMinorVersion(w, val, false, minorVersion)
+}
+
+// Encode encodes val and returns it or an error.
+func EncodeUsingMinorVersion(val interface{}, minorVersion int) ([]byte, error) {
+	return EncodeAndCompressUsingMinorVersion(val, false, minorVersion)
+}
+
+// Marshal is an alias for EncodeTo.
+func MarshalUsingMinorVersion(w io.Writer, val interface{}, minorVersion int) error {
+	return EncodeToUsingMinorVersion(w, val, minorVersion)
+}
+
+// MarshalResponse encodes val into a BURP Response struct and writes it to w,
+// returning any error.
+func MarshalResponseUsingMinorVersion(w io.Writer, val interface{}, minorVersion int) (err error) {
+	return MarshalResponseAndCompressUsingMinorVersion(w, val, false, minorVersion)
+}
+
+// EncodeToAndCompress encodes val and writes it to w, returning any error.
+// If compress is true the body will be compressed
+func EncodeToAndCompressUsingMinorVersion(w io.Writer, val interface{}, compress bool, minorVersion int) (err error) {
 	write1(w, VersionTag)
 	if compress {
 
 		// Write the bytes to a buffer (the original length is required)
 		buf := bytes.NewBuffer([]byte{})
-		err = writeTag(buf, reflect.ValueOf(val))
+		err = writeTag(buf, reflect.ValueOf(val), minorVersion)
 		if err == nil {
 			write1(w, CompressedTag)
 			write4(w, uint32(buf.Len()))
@@ -328,7 +356,7 @@ func EncodeToAndCompress(w io.Writer, val interface{}, compress bool) (err error
 		}
 	} else {
 		// Write directly to the writer
-		err = writeTag(w, reflect.ValueOf(val))
+		err = writeTag(w, reflect.ValueOf(val), minorVersion)
 	}
 	return
 }
@@ -336,22 +364,44 @@ func EncodeToAndCompress(w io.Writer, val interface{}, compress bool) (err error
 // EncodeAndCompress encodes val and returns it or an error.
 // If compress is true the body will be compressed
 func EncodeAndCompress(val interface{}, compress bool) ([]byte, error) {
-	buf := bytes.NewBuffer([]byte{})
-	err := EncodeToAndCompress(buf, val, compress)
-	return buf.Bytes(), err
+	return EncodeAndCompressUsingMinorVersion(val, compress, MinorVersion1)
 }
 
 // MarshalAndCompress is an alias for EncodeTo.
 // If compress is true the body will be compressed
 func MarshalAndCompress(w io.Writer, val interface{}, compress bool) error {
-	return EncodeToAndCompress(w, val, compress)
+	return MarshalAndCompressUsingMinorVersion(w, val, compress, MinorVersion1)
 }
 
 // MarshalResponseAndCompress encodes val into a BURP Response struct and writes it to w,
 // returning any error.
 // If compress is true the body will be compressed
 func MarshalResponseAndCompress(w io.Writer, val interface{}, compress bool) (err error) {
-	resp, err := EncodeAndCompress(val, compress)
+	return MarshalResponseAndCompressUsingMinorVersion(w, val, compress, MinorVersion1)
+}
+
+// EncodeAndCompressUsingMinorVersion encodes val and returns it or an error.
+// If compress is true the body will be compressed
+// It will use the minor version for the encoding
+func EncodeAndCompressUsingMinorVersion(val interface{}, compress bool, minorVersion int) ([]byte, error) {
+	buf := bytes.NewBuffer([]byte{})
+	err := EncodeToAndCompressUsingMinorVersion(buf, val, compress, minorVersion)
+	return buf.Bytes(), err
+}
+
+// MarshalAndCompress is an alias for EncodeTo.
+// If compress is true the body will be compressed
+// It will use the minor version for the encoding
+func MarshalAndCompressUsingMinorVersion(w io.Writer, val interface{}, compress bool, minorVersion int) error {
+	return EncodeToAndCompressUsingMinorVersion(w, val, compress, minorVersion)
+}
+
+// MarshalResponseAndCompress encodes val into a BURP Response struct and writes it to w,
+// returning any error.
+// If compress is true the body will be compressed
+// It will use the minor version for the encoding
+func MarshalResponseAndCompressUsingMinorVersion(w io.Writer, val interface{}, compress bool, minorVersion int) (err error) {
+	resp, err := EncodeAndCompressUsingMinorVersion(val, compress, minorVersion)
 
 	write4(w, uint32(len(resp)))
 	w.Write(resp)

@@ -45,6 +45,11 @@ const (
 	FalseAtom = Atom("false")
 )
 
+const (
+	MinorVersion0 = 0
+	MinorVersion1 = 1
+)
+
 type Term interface{}
 
 type Request struct {
@@ -59,10 +64,10 @@ const (
 	NewCacheEntry byte = 8
 
 	// SegmentIndex can be used to extract the segment index using &
-	SegmentIndex byte  = 7
+	SegmentIndex byte = 7
 
 	// LongAtoms is used to determine if 2 byte atoms are used using &
-	LongAtoms  byte    = 1
+	LongAtoms byte = 1
 )
 
 // As of erts version 5.7.2 the old atom cache protocol was dropped and a new one was introduced.
@@ -146,7 +151,7 @@ func (dh DistributionHeader) Update(r io.Reader) error {
 
 		// Are these long atoms? Check the last half byte least significant bit
 		atomLen := 1
-		if dh.flags[len(dh.flags)-1] & LongAtoms == LongAtoms {
+		if dh.flags[len(dh.flags)-1]&LongAtoms == LongAtoms {
 			atomLen = 2
 		}
 
@@ -164,8 +169,8 @@ func (dh DistributionHeader) Update(r io.Reader) error {
 			newCacheEntry := (flags[i/2] & NewCacheEntry) == NewCacheEntry
 			cacheItem.segmentIndex = flags[i/2] & SegmentIndex
 			if !even {
-				newCacheEntry = (flags[i/2]>>4 & NewCacheEntry) == NewCacheEntry
-				cacheItem.segmentIndex = flags[i/2]>>4 & SegmentIndex
+				newCacheEntry = (flags[i/2] >> 4 & NewCacheEntry) == NewCacheEntry
+				cacheItem.segmentIndex = flags[i/2] >> 4 & SegmentIndex
 			}
 
 			// We have the information to extract this atom

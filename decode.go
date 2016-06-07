@@ -84,7 +84,21 @@ func readSmallInt(r io.Reader) (int, error) {
 	return read1(r)
 }
 
-func readInt(r io.Reader) (int, error) { return read4(r) }
+func readInt(r io.Reader) (int, error) {
+
+	// An integer is a Signed 32bit value
+	// Depending on whether we are on a 32 or 64 bit system the default
+	// int size will change appropriately. Therefore the sign of
+	// a number will be lost when compiling on a 64 bit system but
+	// will work on a 32 bit. The way around this is to cast to a
+	// int32 and then cast back to an int which will keep the sign of the number
+	val, err := read4(r)
+	if err != nil {
+		return val, err
+	}
+
+	return int(int32(val)), nil
+}
 
 func readSmallBignum(r io.Reader) (big.Int, error) {
 	numLen, err := read1(r)
@@ -729,7 +743,6 @@ func readTag(r io.Reader) (Term, error) {
 // DecodeFrom decodes a Term from r and returns it or an error.
 func DecodeFrom(r io.Reader) (Term, error) {
 	version, err := read1(r)
-
 	if err != nil {
 		return nil, err
 	}
