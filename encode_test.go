@@ -101,6 +101,11 @@ func TestEncodeNoCompression(t *testing.T) {
 	assertEncode(t, Atom("foo"),
 		[]byte{131, 100, 0, 3, 102, 111, 111})
 
+	// Atom UTF8
+	assertEncode(t, Atom("foo, 世界"),
+		[]byte{131, 118, 0, 11, 102, 111, 111, 44, 32, 228,
+			184, 150, 231, 149, 140})
+
 	// Small Tuple
 	assertEncode(t, []Term{Atom("foo")},
 		[]byte{131, 104, 1, 100, 0, 3, 102, 111, 111})
@@ -115,6 +120,11 @@ func TestEncodeNoCompression(t *testing.T) {
 			97, 23,
 			97, 42,
 		})
+
+	// Small Tuple with UTF8
+	assertEncode(t, []Term{Atom("foo, 世界")},
+		[]byte{131, 104, 1, 118, 0, 11, 102, 111, 111, 44, 32, 228,
+			184, 150, 231, 149, 140})
 
 	// Nil
 	assertEncode(t, nil, []byte{131, 106})
@@ -135,10 +145,120 @@ func TestEncodeNoCompression(t *testing.T) {
 			100, 0, 1, 97, 100, 0, 1, 98,
 			106,
 		})
+
+	// Map
+	assertEncode(t, map[Term]Term{"key1":"value1", "key2":"value2", "key3":"value3"},
+		[]byte{131, 116, 0, 0, 0, 3, 107, 0, 4, 107, 101, 121, 49, 107, 0, 6, 118,
+			97, 108, 117, 101, 49, 107, 0, 4, 107, 101, 121, 50, 107, 0, 6, 118,
+			97, 108, 117, 101, 50, 107, 0, 4, 107, 101, 121, 51, 107, 0, 6, 118,
+			97, 108, 117, 101, 51,
+		})
+
+	// Pid
+	pid := Pid{}
+	pid.Node = Atom("Node")
+	pid.ID = 123456789
+	pid.Serial = 987654321
+	pid.Creation = 128
+	assertEncode(t, pid,
+		[]byte{131, 103, 100, 0, 4, 78, 111,
+			100, 101, 7, 91, 205, 21, 58,
+			222, 104, 177, 128,
+		})
+
+	// Port
+	port := Port{}
+	port.Node = Atom("Node")
+	port.ID = 123456789
+	port.Creation = 128
+	assertEncode(t, port,
+		[]byte{131, 102, 100, 0, 4, 78, 111, 100,
+			101, 7, 91, 205, 21, 128,
+		})
+
+	// Reference
+	reference := Reference{}
+	reference.Node = Atom("Node")
+	reference.ID = 123456789
+	reference.Creation = 128
+	assertEncode(t, reference,
+		[]byte{131, 101, 100, 0, 4, 78, 111, 100,
+			101, 7, 91, 205, 21, 128,
+		})
+
+	// New Reference
+	newReference := NewReference{}
+	newReference.Creation = 128
+	newReference.ID = []uint32{123,234,345,456,567,678,789,890}
+	newReference.Node = Atom("node")
+	assertEncode(t, newReference,
+		[]byte{131, 114, 0, 8, 100, 0, 4, 110, 111, 100,
+			101, 128, 0, 0, 0, 123, 0, 0, 0, 234, 0,
+			0, 1, 89, 0, 0, 1, 200, 0, 0, 2, 55, 0, 0,
+			2, 166, 0, 0, 3, 21, 0, 0, 3, 122,
+		})
+
+	// Function
+	function := Func{}
+	function.Pid = Pid{Atom("Node"),123456789,987654321,128}
+	function.Module = Atom("module")
+	function.Index = 1234567
+	function.FreeVars = []Term{1, 2.3, "string"}
+	function.Uniq = 987654321
+	assertEncode(t, function,
+		[]byte{131, 117, 0, 0, 0, 3, 103, 100, 0, 4, 78,
+			111, 100, 101, 7, 91, 205, 21, 58, 222,
+			104, 177, 128, 100, 0, 6, 109, 111, 100,
+			117, 108, 101, 98, 0, 18, 214, 135, 98, 58,
+			222, 104, 177, 97, 1, 70, 64, 2, 102, 102,
+			102, 102, 102, 102, 107, 0, 6, 115, 116,
+			114, 105, 110, 103,
+		})
+
+	// New Function
+	newFunction := NewFunc{}
+	newFunction.Uniq = []byte{1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16}
+	newFunction.Arity = 2
+	newFunction.FreeVars = []Term{1, 2.3, "string"}
+	newFunction.Index = 1234567
+	newFunction.Module = Atom("module")
+	newFunction.OldIndex = 1234567
+	newFunction.OldUnique = 987654321
+	newFunction.Pid = Pid{Atom("Node"),123456789,987654321,128}
+	assertEncode(t, newFunction,
+		[]byte{131, 112, 0, 0, 0, 85, 2, 1, 2, 3, 4, 5, 6,
+			7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 0, 18,
+			214, 135, 0, 0, 0, 3, 100, 0, 6, 109, 111,
+			100, 117, 108, 101, 98, 0, 18, 214, 135, 98,
+			58, 222, 104, 177, 103, 100, 0, 4, 78, 111,
+			100, 101, 7, 91, 205, 21, 58, 222, 104, 177,
+			128, 97, 1, 70, 64, 2, 102, 102, 102, 102, 102,
+			102, 107, 0, 6, 115, 116, 114, 105, 110, 103,
+		})
+
+	// Export
+	export := Export{}
+	export.Module = Atom("module")
+	export.Arity = 2
+	export.Function = Atom("function")
+	assertEncode(t, export,
+		[]byte{131, 113, 100, 0, 6, 109, 111, 100, 117, 108,
+			101, 100, 0, 8, 102, 117, 110, 99, 116, 105,
+			111, 110, 97, 2,
+		})
 }
 
 func TestEncodeWithCompression(t *testing.T) {
-	// TODO
+
+	// Test a compressed list
+	assertEncodeAndCompress(t, []Term{Atom("foo, 世界"), Atom("foo, 世界"),
+		Atom("foo, 世界"), Atom("foo, 世界"),
+		Atom("foo, 世界"), Atom("foo, 世界")},
+		[]byte{131, 80, 0, 0, 0, 86, 120, 156, 202, 96, 43,
+			99, 224, 78, 203, 207, 215, 81, 120, 178, 99,
+			218, 243, 169, 61, 212, 225, 1, 2, 0, 0, 255,
+			255, 48, 96, 38, 49,
+		}, true)
 }
 
 func TestMarshal(t *testing.T) {
@@ -159,7 +279,11 @@ func TestMarshalResponse(t *testing.T) {
 }
 
 func assertEncode(t *testing.T, actual interface{}, expected []byte) {
-	assertEncodeUsingMinor(t, actual, expected, false, MinorVersion1)
+	assertEncodeAndCompress(t, actual, expected, false)
+}
+
+func assertEncodeAndCompress(t *testing.T, actual interface{}, expected []byte, compress bool) {
+	assertEncodeUsingMinor(t, actual, expected, compress, MinorVersion1)
 }
 
 func assertEncodeUsingMinor(t *testing.T, actual interface{}, expected []byte, compress bool, minorVersion int) {

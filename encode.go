@@ -131,7 +131,7 @@ func writeNewReference(w io.Writer, l NewReference) {
 	write2(w, uint16(len(l.ID)))
 	writeNode(w, l.Node)
 	write1(w, l.Creation)
-	for i := 0; i < len(l.Node); i++ {
+	for i := 0; i < len(l.ID); i++ {
 		write4(w, l.ID[i])
 	}
 }
@@ -166,7 +166,10 @@ func writeBigNum(w io.Writer, l big.Int) {
 }
 
 func writePort(w io.Writer, l Port) {
-	writeReference(w, l.Reference)
+	write1(w, PortTag)
+	writeNode(w, l.Node)
+	write4(w, l.ID)
+	write1(w, l.Creation)
 }
 
 func writePid(w io.Writer, l Pid) {
@@ -204,10 +207,10 @@ func writeNewFunc(w io.Writer, l NewFunc, minorVersion int) {
 	writeInt(buf, l.OldUnique)
 	writePid(buf, l.Pid)
 	for i := 0; i < len(l.FreeVars); i++ {
-		writeTag(w, reflect.ValueOf(l.FreeVars[i]), minorVersion)
+		writeTag(buf, reflect.ValueOf(l.FreeVars[i]), minorVersion)
 	}
 
-	write4(w, uint32(buf.Len()))
+	write4(w, uint32(buf.Len()+4))
 	w.Write(buf.Bytes())
 }
 

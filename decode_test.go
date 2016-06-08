@@ -141,6 +141,12 @@ func TestDecodeNoCompression(t *testing.T) {
 	assertDecode(t, []byte{131, 100, 0, 5, 104, 101, 108, 108, 111},
 		Atom("hello"))
 
+	// Atom UTF8
+	assertDecode(t,
+		[]byte{131, 118, 0, 11, 102, 111, 111, 44, 32, 228,
+			184, 150, 231, 149, 140},
+		Atom("foo, 世界"))
+
 	// Small Tuple
 	assertDecode(t, []byte{131, 104, 0}, []Term{})
 	assertDecode(t, []byte{131, 104, 1,
@@ -166,6 +172,12 @@ func TestDecodeNoCompression(t *testing.T) {
 		106,
 	},
 		[]Term{Atom("call"), Atom("photox"), Atom("img_size"), []Term{99}})
+
+	// Small Tuple with UTF8
+	assertDecode(t,
+		[]byte{131, 104, 1, 118, 0, 11, 102, 111, 111, 44, 32, 228,
+			184, 150, 231, 149, 140},
+		[]Term{Atom("foo, 世界")})
 
 	// Large Tuple
 
@@ -233,10 +245,120 @@ func TestDecodeNoCompression(t *testing.T) {
 		106,
 	},
 		[]Term{Atom("call"), Atom("photox"), Atom("img_size"), []Term{99}})
+
+	// Map
+	assertDecode(t,
+		[]byte{131, 116, 0, 0, 0, 3, 107, 0, 4, 107, 101, 121, 49, 107, 0, 6, 118,
+			97, 108, 117, 101, 49, 107, 0, 4, 107, 101, 121, 50, 107, 0, 6, 118,
+			97, 108, 117, 101, 50, 107, 0, 4, 107, 101, 121, 51, 107, 0, 6, 118,
+			97, 108, 117, 101, 51,
+		}, map[Term]Term{"key1":"value1", "key2":"value2", "key3":"value3"})
+
+	// Pid
+	pid := Pid{}
+	pid.Node = Atom("Node")
+	pid.ID = 123456789
+	pid.Serial = 987654321
+	pid.Creation = 128
+	assertDecode(t,
+		[]byte{131, 103, 100, 0, 4, 78, 111,
+			100, 101, 7, 91, 205, 21, 58,
+			222, 104, 177, 128,
+		}, pid)
+
+	// Port
+	port := Port{}
+	port.Node = Atom("Node")
+	port.ID = 123456789
+	port.Creation = 128
+	assertDecode(t,
+		[]byte{131, 102, 100, 0, 4, 78, 111, 100,
+			101, 7, 91, 205, 21, 128,
+		}, port)
+
+	// Reference
+	reference := Reference{}
+	reference.Node = Atom("Node")
+	reference.ID = 123456789
+	reference.Creation = 128
+	assertDecode(t,
+		[]byte{131, 101, 100, 0, 4, 78, 111, 100,
+			101, 7, 91, 205, 21, 128,
+		}, reference)
+
+	// New Reference
+	newReference := NewReference{}
+	newReference.Creation = 128
+	newReference.ID = []uint32{123,234,345,456,567,678,789,890}
+	newReference.Node = Atom("node")
+	assertDecode(t,
+		[]byte{131, 114, 0, 8, 100, 0, 4, 110, 111, 100,
+			101, 128, 0, 0, 0, 123, 0, 0, 0, 234, 0,
+			0, 1, 89, 0, 0, 1, 200, 0, 0, 2, 55, 0, 0,
+			2, 166, 0, 0, 3, 21, 0, 0, 3, 122,
+		}, newReference)
+
+	// Function
+	function := Func{}
+	function.Pid = Pid{Atom("Node"),123456789,987654321,128}
+	function.Module = Atom("module")
+	function.Index = 1234567
+	function.FreeVars = []Term{1, 2.3, "string"}
+	function.Uniq = 987654321
+	assertDecode(t,
+		[]byte{131, 117, 0, 0, 0, 3, 103, 100, 0, 4, 78,
+			111, 100, 101, 7, 91, 205, 21, 58, 222,
+			104, 177, 128, 100, 0, 6, 109, 111, 100,
+			117, 108, 101, 98, 0, 18, 214, 135, 98, 58,
+			222, 104, 177, 97, 1, 70, 64, 2, 102, 102,
+			102, 102, 102, 102, 107, 0, 6, 115, 116,
+			114, 105, 110, 103,
+		}, function)
+
+	// New Function
+	newFunction := NewFunc{}
+	newFunction.Uniq = []byte{1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16}
+	newFunction.Arity = 2
+	newFunction.FreeVars = []Term{1, 2.3, "string"}
+	newFunction.Index = 1234567
+	newFunction.Module = Atom("module")
+	newFunction.OldIndex = 1234567
+	newFunction.OldUnique = 987654321
+	newFunction.Pid = Pid{Atom("Node"),123456789,987654321,128}
+	assertDecode(t,
+		[]byte{131, 112, 0, 0, 0, 85, 2, 1, 2, 3, 4, 5, 6,
+			7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 0, 18,
+			214, 135, 0, 0, 0, 3, 100, 0, 6, 109, 111,
+			100, 117, 108, 101, 98, 0, 18, 214, 135, 98,
+			58, 222, 104, 177, 103, 100, 0, 4, 78, 111,
+			100, 101, 7, 91, 205, 21, 58, 222, 104, 177,
+			128, 97, 1, 70, 64, 2, 102, 102, 102, 102, 102,
+			102, 107, 0, 6, 115, 116, 114, 105, 110, 103,
+		}, newFunction)
+
+	// Export
+	export := Export{}
+	export.Module = Atom("module")
+	export.Arity = 2
+	export.Function = Atom("function")
+	assertDecode(t,
+		[]byte{131, 113, 100, 0, 6, 109, 111, 100, 117, 108,
+			101, 100, 0, 8, 102, 117, 110, 99, 116, 105,
+			111, 110, 97, 2,
+		}, export)
 }
 
 func TestDecodeWithCompression(t *testing.T) {
-	// TODO
+
+	// Test a compressed list
+	assertDecode(t,
+		[]byte{131, 80, 0, 0, 0, 86, 120, 156, 202, 96, 43,
+			99, 224, 78, 203, 207, 215, 81, 120, 178, 99,
+			218, 243, 169, 61, 212, 225, 1, 2, 0, 0, 255,
+			255, 48, 96, 38, 49,
+		}, []Term{Atom("foo, 世界"), Atom("foo, 世界"),
+			Atom("foo, 世界"), Atom("foo, 世界"),
+			Atom("foo, 世界"), Atom("foo, 世界")})
 }
 
 func assertDecode(t *testing.T, data []byte, expected interface{}) {

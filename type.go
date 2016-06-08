@@ -60,13 +60,13 @@ type Request struct {
 }
 
 const (
-	// NewCacheEntry is used to determine if an entry is a new cache entry using &
+	// NewCacheEntry is used to determine if an entry is a new cache entry
 	NewCacheEntry byte = 8
 
-	// SegmentIndex can be used to extract the segment index using &
+	// SegmentIndex can be used to extract the segment index
 	SegmentIndex byte = 7
 
-	// LongAtoms is used to determine if 2 byte atoms are used using &
+	// LongAtoms is used to determine if 2 byte atoms are used
 	LongAtoms byte = 1
 )
 
@@ -252,7 +252,9 @@ type NewReference struct {
 // Encode a port object (obtained form open_port/2). The ID is a node specific identifier for a local port.
 // Port operations are not allowed across node boundaries. The Creation works just like in REFERENCE_EXT.
 type Port struct {
-	Reference
+	Node     Atom
+	ID       uint32
+	Creation uint8
 }
 
 // Pid wraps the PID_EXT tag type (103)

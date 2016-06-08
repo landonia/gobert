@@ -438,12 +438,30 @@ func readNewReference(r io.Reader) (NewReference, error) {
 func readPort(r io.Reader) (Port, error) {
 	port := Port{}
 
-	reference, err := readReference(r)
+	term, err := readTag(r)
 	if err != nil {
 		return port, err
 	}
 
-	port.Reference = reference
+	switch a := term.(type) {
+	case Atom:
+		port.Node = a
+	default:
+		return port, ErrMissingAtom
+	}
+
+	id, err := read4(r)
+	if err != nil {
+		return port, err
+	}
+	port.ID = uint32(id)
+
+	creation, err := read1(r)
+	if err != nil {
+		return port, err
+	}
+	port.Creation = uint8(creation)
+
 	return port, nil
 }
 
@@ -491,13 +509,19 @@ func readFunc(r io.Reader) (Func, error) {
 		return function, err
 	}
 
-	pid, err := readPid(r)
+	term, err := readTag(r)
 	if err != nil {
 		return function, err
 	}
-	function.Pid = pid
 
-	term, err := readTag(r)
+	switch pid := term.(type) {
+	case Pid:
+		function.Pid = pid
+	default:
+		return function, ErrUnknownType
+	}
+
+	term, err = readTag(r)
 	if err != nil {
 		return function, err
 	}
@@ -506,7 +530,7 @@ func readFunc(r io.Reader) (Func, error) {
 	case Atom:
 		function.Module = module
 	default:
-		return function, ErrMissingAtom
+		return function, ErrUnknownType
 	}
 
 	term, err = readTag(r)
@@ -571,22 +595,18 @@ func readNewFunc(r io.Reader) (NewFunc, error) {
 	}
 	function.Uniq = uniq
 
-	term, err := readTag(lr)
+	index, err := read4(lr)
 	if err != nil {
 		return function, err
 	}
-
-	switch v := reflect.ValueOf(term); v.Kind() {
-	case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
-		function.Index = uint32(v.Int())
-	}
+	function.Index = uint32(index)
 
 	numfree, err := read4(lr)
 	if err != nil {
 		return function, err
 	}
 
-	term, err = readTag(lr)
+	term, err := readTag(lr)
 	if err != nil {
 		return function, err
 	}
@@ -595,7 +615,7 @@ func readNewFunc(r io.Reader) (NewFunc, error) {
 	case Atom:
 		function.Module = module
 	default:
-		return function, ErrMissingAtom
+		return function, ErrUnknownType
 	}
 
 	term, err = readTag(lr)
@@ -622,11 +642,17 @@ func readNewFunc(r io.Reader) (NewFunc, error) {
 		return function, ErrUnknownType
 	}
 
-	pid, err := readPid(lr)
+	term, err = readTag(lr)
 	if err != nil {
 		return function, err
 	}
-	function.Pid = pid
+
+	switch pid := term.(type) {
+	case Pid:
+		function.Pid = pid
+	default:
+		return function, ErrUnknownType
+	}
 
 	// Extract the free vars
 	freeVars := make([]Term, numfree)
@@ -669,11 +695,17 @@ func readExport(r io.Reader) (Export, error) {
 		return export, ErrMissingAtom
 	}
 
-	arity, err := readSmallInt(r)
+	term, err = readTag(r)
 	if err != nil {
 		return export, err
 	}
-	export.Arity = uint8(arity)
+
+	switch v := reflect.ValueOf(term); v.Kind() {
+	case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
+		export.Arity = uint8(v.Int())
+	default:
+		return export, ErrUnknownType
+	}
 
 	return export, nil
 }
