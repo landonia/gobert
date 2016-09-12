@@ -303,18 +303,26 @@ func readList(r io.Reader) ([]Term, error) {
 	return list, nil
 }
 
-func readBin(r io.Reader) ([]uint8, error) {
+// use a specific type for the bin type so that
+type bin []uint8
+
+// String will attempt to print the value as a string
+func (b bin) String() string {
+	return fmt.Sprintf("%s", string(b))
+}
+
+func readBin(r io.Reader) (bin, error) {
 	size, err := read4(r)
 	if err != nil {
-		return []uint8{}, err
+		return bin{}, err
 	}
 
 	bytes, err := ioutil.ReadAll(io.LimitReader(r, int64(size)))
 	if err != nil {
-		return []uint8{}, err
+		return bin{}, err
 	}
 
-	return bytes, nil
+	return bin(bytes), nil
 }
 
 func readMap(r io.Reader) (map[Term]Term, error) {
@@ -712,7 +720,6 @@ func readTag(r io.Reader) (Term, error) {
 	if err != nil {
 		return nil, err
 	}
-	fmt.Println("TAG TYPE: %d", tag)
 
 	switch tag {
 	case CompressedTag:
@@ -767,7 +774,6 @@ func readTag(r io.Reader) (Term, error) {
 		return readExport(r)
 	}
 
-	fmt.Println("UNKNOWN TYPE: %d", tag)
 	return nil, ErrUnknownType
 }
 
