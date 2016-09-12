@@ -11,6 +11,7 @@ import (
 	"reflect"
 	"strconv"
 	"math/big"
+	"fmt"
 )
 
 var (
@@ -249,10 +250,6 @@ func readLargeTuple(r io.Reader) (Term, error) {
 }
 
 func readNil(r io.Reader) ([]Term, error) {
-	_, err := ioutil.ReadAll(io.LimitReader(r, 1))
-	if err != nil {
-		return nil, err
-	}
 	list := make([]Term, 0)
 	return list, nil
 }
@@ -715,6 +712,7 @@ func readTag(r io.Reader) (Term, error) {
 	if err != nil {
 		return nil, err
 	}
+	fmt.Println("TAG TYPE: %d", tag)
 
 	switch tag {
 	case CompressedTag:
@@ -769,6 +767,7 @@ func readTag(r io.Reader) (Term, error) {
 		return readExport(r)
 	}
 
+	fmt.Println("UNKNOWN TYPE: %d", tag)
 	return nil, ErrUnknownType
 }
 
