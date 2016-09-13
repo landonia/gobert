@@ -5,13 +5,14 @@ import (
 	"compress/zlib"
 	"encoding/binary"
 	"errors"
+	"fmt"
 	"io"
 	"io/ioutil"
 	"math"
-	"reflect"
-	"strconv"
 	"math/big"
-	"fmt"
+	"reflect"
+	"sort"
+	"strconv"
 )
 
 var (
@@ -131,7 +132,7 @@ func readBigNum(r io.Reader, numLen int) (big.Int, error) {
 	// The bytes are stored with the LSB byte stored first
 	// Reverse the array to get BigEndian
 	var bigEndBits []byte
-	for i := len(bits)-1; i >= 0; i-- {
+	for i := len(bits) - 1; i >= 0; i-- {
 		bigEndBits = append(bigEndBits, bits[i])
 	}
 
@@ -304,28 +305,58 @@ func readList(r io.Reader) ([]Term, error) {
 }
 
 // use a specific type for the bin type so that
-type bin []uint8
+type bintag []uint8
 
 // String will attempt to print the value as a string
-func (b bin) String() string {
+func (b bintag) String() string {
 	return fmt.Sprintf("%s", string(b))
 }
 
-func readBin(r io.Reader) (bin, error) {
+func readBin(r io.Reader) (bintag, error) {
 	size, err := read4(r)
 	if err != nil {
-		return bin{}, err
+		return bintag{}, err
 	}
 
 	bytes, err := ioutil.ReadAll(io.LimitReader(r, int64(size)))
 	if err != nil {
-		return bin{}, err
+		return bintag{}, err
 	}
 
-	return bin(bytes), nil
+	return bintag(bytes), nil
 }
 
-func readMap(r io.Reader) (map[Term]Term, error) {
+// maptag is a specific type that allows us to override the print statement to always ensure
+// that the keys are printed in order
+type maptag map[Term]Term
+
+func (m maptag) String() string {
+
+	// Cast back to the map type
+	var keys []string
+	realKeys := map[string]Term{}
+	for k := range m {
+
+		// Turn the key into a string representation in order to quickly sort it
+		key := fmt.Sprintf("%v", k)
+		keys = append(keys, key)
+		realKeys[key] = k
+	}
+	sort.Strings(keys)
+
+	// To perform the opertion you want
+	r := "{"
+	for _, k := range keys {
+
+		// get the real key for this stringified version
+		rk := realKeys[k]
+		r += fmt.Sprintf("%v:%v,", rk, m[rk])
+	}
+	r += "}"
+	return r
+}
+
+func readMap(r io.Reader) (maptag, error) {
 	pairs, err := read4(r)
 	if err != nil {
 		return nil, err
@@ -345,7 +376,7 @@ func readMap(r io.Reader) (map[Term]Term, error) {
 		m[key] = value
 	}
 
-	return m, nil
+	return maptag(m), nil
 }
 
 func readComplex(r io.Reader) (Term, error) {
