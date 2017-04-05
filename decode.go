@@ -19,13 +19,25 @@ var (
 	ErrBadMagic    error = errors.New("bad magic")
 	ErrUnknownType error = errors.New("unknown type")
 	ErrMissingAtom error = errors.New("missing Atom")
+	ErrEOF error         = errors.New("Unexpected EOF")
 
 	// The atom distribution cache
 	cache = DistributionHeader{}
 )
 
+func readLength(r io.Reader, length int64) ([]byte, error) {
+	bits, err := ioutil.ReadAll(io.LimitReader(r, length))
+	if err != nil {
+		return nil, err
+	}
+	if (int64(len(bits)) != length) {
+		return nil, ErrEOF
+	}
+	return bits, nil
+}
+
 func read1(r io.Reader) (int, error) {
-	bits, err := ioutil.ReadAll(io.LimitReader(r, 1))
+	bits, err := readLength(r, 1)
 	if err != nil {
 		return 0, err
 	}
@@ -35,7 +47,7 @@ func read1(r io.Reader) (int, error) {
 }
 
 func read2(r io.Reader) (int, error) {
-	bits, err := ioutil.ReadAll(io.LimitReader(r, 2))
+	bits, err := readLength(r, 2)
 	if err != nil {
 		return 0, err
 	}
@@ -45,7 +57,7 @@ func read2(r io.Reader) (int, error) {
 }
 
 func read4(r io.Reader) (int, error) {
-	bits, err := ioutil.ReadAll(io.LimitReader(r, 4))
+	bits, err := readLength(r, 4)
 	if err != nil {
 		return 0, err
 	}
@@ -124,7 +136,7 @@ func readBigNum(r io.Reader, numLen int) (big.Int, error) {
 		return *big.NewInt(0), err
 	}
 
-	bits, err := ioutil.ReadAll(io.LimitReader(r, int64(numLen)))
+	bits, err := readLength(r, int64(numLen))
 	if err != nil {
 		return *big.NewInt(0), err
 	}
@@ -148,7 +160,7 @@ func readBigNum(r io.Reader, numLen int) (big.Int, error) {
 }
 
 func readFloat(r io.Reader) (float32, error) {
-	bits, err := ioutil.ReadAll(io.LimitReader(r, 31))
+	bits, err := readLength(r, 31)
 	if err != nil {
 		return 0, err
 	}
@@ -169,7 +181,7 @@ func readFloat(r io.Reader) (float32, error) {
 }
 
 func readNewFloat(r io.Reader) (float64, error) {
-	bits, err := ioutil.ReadAll(io.LimitReader(r, 8))
+	bits, err := readLength(r, 8)
 	if err != nil {
 		return 0, err
 	}
@@ -261,7 +273,7 @@ func readString(r io.Reader) (string, error) {
 		return "", err
 	}
 
-	str, err := ioutil.ReadAll(io.LimitReader(r, int64(size)))
+	str, err := readLength(r, int64(size))
 	if err != nil {
 		return "", err
 	}
@@ -275,7 +287,7 @@ func readSmallString(r io.Reader) (string, error) {
 		return "", err
 	}
 
-	str, err := ioutil.ReadAll(io.LimitReader(r, int64(size)))
+	str, err := readLength(r, int64(size))
 	if err != nil {
 		return "", err
 	}
@@ -318,7 +330,7 @@ func readBin(r io.Reader) (bintag, error) {
 		return bintag{}, err
 	}
 
-	bytes, err := ioutil.ReadAll(io.LimitReader(r, int64(size)))
+	bytes, err := readLength(r, int64(size))
 	if err != nil {
 		return bintag{}, err
 	}
@@ -625,7 +637,7 @@ func readNewFunc(r io.Reader) (NewFunc, error) {
 	}
 	function.Arity = uint8(arity)
 
-	uniq, err := ioutil.ReadAll(io.LimitReader(r, 16))
+	uniq, err := readLength(r, 16)
 	if err != nil {
 		return function, err
 	}
