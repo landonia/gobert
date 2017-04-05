@@ -19,7 +19,7 @@ var (
 	ErrBadMagic    error = errors.New("bad magic")
 	ErrUnknownType error = errors.New("unknown type")
 	ErrMissingAtom error = errors.New("missing Atom")
-	ErrEOF error         = errors.New("Unexpected EOF")
+	ErrEOF         error = errors.New("Unexpected EOF")
 
 	// The atom distribution cache
 	cache = DistributionHeader{}
@@ -30,7 +30,7 @@ func readLength(r io.Reader, length int64) ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
-	if (int64(len(bits)) != length) {
+	if int64(len(bits)) != length {
 		return nil, ErrEOF
 	}
 	return bits, nil
