@@ -227,10 +227,10 @@ func TestDecodeNoCompression(t *testing.T) {
 		[]Term{Atom("a"), []Term{256}})
 
 	// Binary
-	assertDecode(t, []byte{131, 109, 0, 0, 0, 3, 102, 111, 111},
-		[]uint8{102, 111, 111})
+	assertDecode(t, []uint8{131, 109, 0, 0, 0, 3, 102, 111, 111},
+		bintag{102, 111, 111})
 	assertDecode(t, []byte{131, 109, 0, 0, 0, 5, 104, 101, 108, 108, 111},
-		[]uint8{104, 101, 108, 108, 111})
+		bintag{104, 101, 108, 108, 111})
 
 	// Complex
 	assertDecode(t, []byte{131, 104, 2, 100, 0, 4, 98, 101, 114, 116, 100, 0, 3, 110, 105, 108}, nil)
@@ -252,7 +252,7 @@ func TestDecodeNoCompression(t *testing.T) {
 			97, 108, 117, 101, 49, 107, 0, 4, 107, 101, 121, 50, 107, 0, 6, 118,
 			97, 108, 117, 101, 50, 107, 0, 4, 107, 101, 121, 51, 107, 0, 6, 118,
 			97, 108, 117, 101, 51,
-		}, map[Term]Term{"key1":"value1", "key2":"value2", "key3":"value3"})
+		}, maptag{"key1":"value1", "key2":"value2", "key3":"value3"})
 
 	// Pid
 	pid := Pid{}
