@@ -147,7 +147,7 @@ func TestEncodeNoCompression(t *testing.T) {
 		})
 
 	// Map
-	assertEncode(t, map[Term]Term{"key1":"value1", "key2":"value2", "key3":"value3"},
+	assertEncode(t, map[Term]Term{"key1": "value1", "key2": "value2", "key3": "value3"},
 		[]byte{131, 116, 0, 0, 0, 3, 107, 0, 4, 107, 101, 121, 49, 107, 0, 6, 118,
 			97, 108, 117, 101, 49, 107, 0, 4, 107, 101, 121, 50, 107, 0, 6, 118,
 			97, 108, 117, 101, 50, 107, 0, 4, 107, 101, 121, 51, 107, 0, 6, 118,
@@ -189,7 +189,7 @@ func TestEncodeNoCompression(t *testing.T) {
 	// New Reference
 	newReference := NewReference{}
 	newReference.Creation = 128
-	newReference.ID = []uint32{123,234,345,456,567,678,789,890}
+	newReference.ID = []uint32{123, 234, 345, 456, 567, 678, 789, 890}
 	newReference.Node = Atom("node")
 	assertEncode(t, newReference,
 		[]byte{131, 114, 0, 8, 100, 0, 4, 110, 111, 100,
@@ -200,7 +200,7 @@ func TestEncodeNoCompression(t *testing.T) {
 
 	// Function
 	function := Func{}
-	function.Pid = Pid{Atom("Node"),123456789,987654321,128}
+	function.Pid = Pid{Atom("Node"), 123456789, 987654321, 128}
 	function.Module = Atom("module")
 	function.Index = 1234567
 	function.FreeVars = []Term{1, 2.3, "string"}
@@ -217,14 +217,14 @@ func TestEncodeNoCompression(t *testing.T) {
 
 	// New Function
 	newFunction := NewFunc{}
-	newFunction.Uniq = []byte{1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16}
+	newFunction.Uniq = []byte{1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16}
 	newFunction.Arity = 2
 	newFunction.FreeVars = []Term{1, 2.3, "string"}
 	newFunction.Index = 1234567
 	newFunction.Module = Atom("module")
 	newFunction.OldIndex = 1234567
 	newFunction.OldUnique = 987654321
-	newFunction.Pid = Pid{Atom("Node"),123456789,987654321,128}
+	newFunction.Pid = Pid{Atom("Node"), 123456789, 987654321, 128}
 	assertEncode(t, newFunction,
 		[]byte{131, 112, 0, 0, 0, 85, 2, 1, 2, 3, 4, 5, 6,
 			7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 0, 18,

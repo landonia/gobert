@@ -3,9 +3,9 @@ package bert
 import (
 	"bytes"
 	"fmt"
+	"math/big"
 	"reflect"
 	"testing"
-	"math/big"
 )
 
 func ExampleDecode() {
@@ -123,16 +123,13 @@ func TestDecodeNoCompression(t *testing.T) {
 
 	// NewFloat
 	assertDecode(t,
-		[]byte{131, 70, 63, 224, 0, 0, 0, 0, 0, 0,
-	},
+		[]byte{131, 70, 63, 224, 0, 0, 0, 0, 0, 0},
 		0.5)
 	assertDecode(t,
-		[]byte{131, 70, 64, 9, 33, 249, 240, 27, 134, 110,
-	},
+		[]byte{131, 70, 64, 9, 33, 249, 240, 27, 134, 110},
 		3.14159)
 	assertDecode(t,
-		[]byte{131, 70, 192, 9, 33, 249, 240, 27, 134, 110,
-	},
+		[]byte{131, 70, 192, 9, 33, 249, 240, 27, 134, 110},
 		-3.14159)
 
 	// Atom
@@ -227,10 +224,10 @@ func TestDecodeNoCompression(t *testing.T) {
 		[]Term{Atom("a"), []Term{256}})
 
 	// Binary
-	assertDecode(t, []byte{131, 109, 0, 0, 0, 3, 102, 111, 111},
-		[]uint8{102, 111, 111})
+	assertDecode(t, []uint8{131, 109, 0, 0, 0, 3, 102, 111, 111},
+		bintag{102, 111, 111})
 	assertDecode(t, []byte{131, 109, 0, 0, 0, 5, 104, 101, 108, 108, 111},
-		[]uint8{104, 101, 108, 108, 111})
+		bintag{104, 101, 108, 108, 111})
 
 	// Complex
 	assertDecode(t, []byte{131, 104, 2, 100, 0, 4, 98, 101, 114, 116, 100, 0, 3, 110, 105, 108}, nil)
@@ -252,7 +249,7 @@ func TestDecodeNoCompression(t *testing.T) {
 			97, 108, 117, 101, 49, 107, 0, 4, 107, 101, 121, 50, 107, 0, 6, 118,
 			97, 108, 117, 101, 50, 107, 0, 4, 107, 101, 121, 51, 107, 0, 6, 118,
 			97, 108, 117, 101, 51,
-		}, map[Term]Term{"key1":"value1", "key2":"value2", "key3":"value3"})
+		}, maptag{"key1": "value1", "key2": "value2", "key3": "value3"})
 
 	// Pid
 	pid := Pid{}
@@ -289,7 +286,7 @@ func TestDecodeNoCompression(t *testing.T) {
 	// New Reference
 	newReference := NewReference{}
 	newReference.Creation = 128
-	newReference.ID = []uint32{123,234,345,456,567,678,789,890}
+	newReference.ID = []uint32{123, 234, 345, 456, 567, 678, 789, 890}
 	newReference.Node = Atom("node")
 	assertDecode(t,
 		[]byte{131, 114, 0, 8, 100, 0, 4, 110, 111, 100,
@@ -300,7 +297,7 @@ func TestDecodeNoCompression(t *testing.T) {
 
 	// Function
 	function := Func{}
-	function.Pid = Pid{Atom("Node"),123456789,987654321,128}
+	function.Pid = Pid{Atom("Node"), 123456789, 987654321, 128}
 	function.Module = Atom("module")
 	function.Index = 1234567
 	function.FreeVars = []Term{1, 2.3, "string"}
@@ -317,14 +314,14 @@ func TestDecodeNoCompression(t *testing.T) {
 
 	// New Function
 	newFunction := NewFunc{}
-	newFunction.Uniq = []byte{1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16}
+	newFunction.Uniq = []byte{1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16}
 	newFunction.Arity = 2
 	newFunction.FreeVars = []Term{1, 2.3, "string"}
 	newFunction.Index = 1234567
 	newFunction.Module = Atom("module")
 	newFunction.OldIndex = 1234567
 	newFunction.OldUnique = 987654321
-	newFunction.Pid = Pid{Atom("Node"),123456789,987654321,128}
+	newFunction.Pid = Pid{Atom("Node"), 123456789, 987654321, 128}
 	assertDecode(t,
 		[]byte{131, 112, 0, 0, 0, 85, 2, 1, 2, 3, 4, 5, 6,
 			7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 0, 18,
