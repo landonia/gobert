@@ -340,9 +340,9 @@ func readBin(r io.Reader) (bintag, error) {
 
 // maptag is a specific type that allows us to override the print statement to always ensure
 // that the keys are printed in order
-type maptag map[Term]Term
+type Map map[Term]Term
 
-func (m maptag) String() string {
+func (m Map) String() string {
 
 	// Cast back to the map type
 	var keys []string
@@ -368,7 +368,7 @@ func (m maptag) String() string {
 	return r
 }
 
-func readMap(r io.Reader) (maptag, error) {
+func readMap(r io.Reader) (Map, error) {
 	pairs, err := read4(r)
 	if err != nil {
 		return nil, err
@@ -388,7 +388,7 @@ func readMap(r io.Reader) (maptag, error) {
 		m[key] = value
 	}
 
-	return maptag(m), nil
+	return Map(m), nil
 }
 
 func readComplex(r io.Reader) (Term, error) {
