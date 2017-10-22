@@ -7,7 +7,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"math"
 	"math/big"
 	"reflect"
@@ -26,14 +25,15 @@ var (
 )
 
 func readLength(r io.Reader, length int64) ([]byte, error) {
-	bits, err := ioutil.ReadAll(io.LimitReader(r, length))
-	if err != nil {
-		return nil, err
+	bits := make([]byte, length)
+	n, err := r.Read(bits) //read can read n bytes and return an error (e.g. EOF)
+	if int64(n) == length {
+		return bits, nil
 	}
-	if int64(len(bits)) != length {
+	if err == io.ErrUnexpectedEOF {
 		return nil, ErrEOF
 	}
-	return bits, nil
+	return nil, err
 }
 
 func read1(r io.Reader) (int, error) {
