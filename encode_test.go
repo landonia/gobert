@@ -279,14 +279,17 @@ func TestMarshalResponse(t *testing.T) {
 }
 
 func assertEncode(t *testing.T, actual interface{}, expected []byte) {
+	t.Helper()
 	assertEncodeAndCompress(t, actual, expected, false)
 }
 
 func assertEncodeAndCompress(t *testing.T, actual interface{}, expected []byte, compress bool) {
+	t.Helper()
 	assertEncodeUsingMinor(t, actual, expected, compress, MinorVersion1)
 }
 
 func assertEncodeUsingMinor(t *testing.T, actual interface{}, expected []byte, compress bool, minorVersion int) {
+	t.Helper()
 	val, err := EncodeAndCompressUsingMinorVersion(actual, compress, minorVersion)
 	if err != nil {
 		t.Errorf("Encode(%v) returned error '%v'", actual, err)

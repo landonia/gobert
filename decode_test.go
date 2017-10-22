@@ -359,6 +359,7 @@ func TestDecodeWithCompression(t *testing.T) {
 }
 
 func assertDecode(t *testing.T, data []byte, expected interface{}) {
+	t.Helper()
 	val, err := Decode(data)
 	if err != nil {
 		t.Errorf("Decode(%v) returned error '%v'", data, err)
