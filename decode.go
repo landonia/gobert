@@ -387,7 +387,7 @@ func readMap(r io.Reader) (Map, error) {
 		}
 		switch v := key.(type) {
 		case fmt.Stringer:
-			m[v.String] = value
+			m[v.String()] = value
 		default:
 			m[v] = value
 		}
