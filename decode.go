@@ -7,7 +7,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"math"
 	"math/big"
 	"reflect"
@@ -26,14 +25,15 @@ var (
 )
 
 func readLength(r io.Reader, length int64) ([]byte, error) {
-	bits, err := ioutil.ReadAll(io.LimitReader(r, length))
-	if err != nil {
-		return nil, err
+	bits := make([]byte, length)
+	n, err := r.Read(bits) //read can read n bytes and return an error (e.g. EOF)
+	if int64(n) == length {
+		return bits, nil
 	}
-	if int64(len(bits)) != length {
+	if err == io.ErrUnexpectedEOF {
 		return nil, ErrEOF
 	}
-	return bits, nil
+	return nil, err
 }
 
 func read1(r io.Reader) (int, error) {
@@ -340,9 +340,9 @@ func readBin(r io.Reader) (bintag, error) {
 
 // maptag is a specific type that allows us to override the print statement to always ensure
 // that the keys are printed in order
-type maptag map[Term]Term
+type Map map[Term]Term
 
-func (m maptag) String() string {
+func (m Map) String() string {
 
 	// Cast back to the map type
 	var keys []string
@@ -368,7 +368,7 @@ func (m maptag) String() string {
 	return r
 }
 
-func readMap(r io.Reader) (maptag, error) {
+func readMap(r io.Reader) (Map, error) {
 	pairs, err := read4(r)
 	if err != nil {
 		return nil, err
@@ -385,10 +385,15 @@ func readMap(r io.Reader) (maptag, error) {
 		if err != nil {
 			return nil, err
 		}
-		m[key] = value
+		switch v := key.(type) {
+		case fmt.Stringer:
+			m[v.String()] = value
+		default:
+			m[v] = value
+		}
 	}
 
-	return maptag(m), nil
+	return Map(m), nil
 }
 
 func readComplex(r io.Reader) (Term, error) {

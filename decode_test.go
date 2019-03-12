@@ -249,7 +249,7 @@ func TestDecodeNoCompression(t *testing.T) {
 			97, 108, 117, 101, 49, 107, 0, 4, 107, 101, 121, 50, 107, 0, 6, 118,
 			97, 108, 117, 101, 50, 107, 0, 4, 107, 101, 121, 51, 107, 0, 6, 118,
 			97, 108, 117, 101, 51,
-		}, maptag{"key1": "value1", "key2": "value2", "key3": "value3"})
+		}, Map{"key1": "value1", "key2": "value2", "key3": "value3"})
 
 	// Pid
 	pid := Pid{}
@@ -359,6 +359,7 @@ func TestDecodeWithCompression(t *testing.T) {
 }
 
 func assertDecode(t *testing.T, data []byte, expected interface{}) {
+	t.Helper()
 	val, err := Decode(data)
 	if err != nil {
 		t.Errorf("Decode(%v) returned error '%v'", data, err)
